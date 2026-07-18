@@ -1,0 +1,30 @@
+ such file or directory
+2026/05/24 18:45:56 [ARDUINO] Botao 3 concluido em 1m0.003884965s: 0 clips criados, 0 enviados para upload
+2026/05/24 18:45:56 [ARDUINO] ========== FIM BOTAO 3 ==========
+2026/05/24 18:45:57 http: superfluous response.WriteHeader call from meuapito/handlers.WriteJSON (api.go:20)
+2026/05/24 18:45:59 [SERIAL] Healthcheck: running=true ultimaLeitura=18:45:59 atrasado=false ultimoPing=18:45:30 semPing=false reconexoes=0 erros=0 goroutines=15
+2026/05/24 18:45:59 [HEARTBEAT] goroutines=15 | uploads_ativos=0 | clips_total=0 | botoes_total=2 | ultimo_botao=1m3s | arduino=conectado | cameras_ativas=2/2 | mem=0.8MB
+[DEBUG][Camera 2] FFmpeg segment muxer: segmentCount=6 segmentTime=15s goroutines=16
+[DEBUG][Camera 2] FFmpeg iniciado PID=2000
+2026/05/24 18:46:01 [SERIAL] Recebido: "PING"
+[DEBUG][Camera 1] FFmpeg segment muxer: segmentCount=6 segmentTime=15s goroutines=19
+[DEBUG][Camera 1] FFmpeg iniciado PID=2001
+❌ [Camera 2 - camera2] Erro na gravação (3/5): ffmpeg encerrou inesperadamente: exit status 8
+2026/05/24 18:46:02 http: superfluous response.WriteHeader call from meuapito/handlers.WriteJSON (api.go:20)
+❌ [Camera 1 - camera1] Erro na gravação (3/5): ffmpeg encerrou inesperadamente: exit status 8
+[DEBUG][Camera 2] FFmpeg segment muxer: segmentCount=6 segmentTime=15s goroutines=16
+[DEBUG][Camera 2] FFmpeg iniciado PID=2002
+❌ [Camera 2 - camera2] Erro na gravação (4/5): ffmpeg encerrou inesperadamente: exit status 8
+[DEBUG][Camera 1] FFmpeg segment muxer: segmentCount=6 segmentTime=15s goroutines=16
+[DEBUG][Camera 1] FFmpeg iniciado PID=2003
+2026/05/24 18:46:07 http: superfluous response.WriteHeader call from meuapito/handlers.WriteJSON (api.go:20)
+❌ [Camera 1 - camera1] Erro na gravação (4/5): ffmpeg encerrou inesperadamente: exit status 8
+2026/05/24 18:46:09 [SERIAL] Healthcheck: running=true ultimaLeitura=18:46:09 atrasado=false ultimoPing=18:46:01 semPing=false reconexoes=0 erros=0 goroutines=15
+[DEBUG][Camera 2] FFmpeg segment muxer: segmentCount=6 segmentTime=15s goroutines=16
+[DEBUG][Camera 2] FFmpeg iniciado PID=2004
+2026/05/24 18:46:12 http: superfluous response.WriteHeader call from meuapito/handlers.WriteJSON (api.go:20)
+❌ [Camera 2 - camera2] Erro na gravação (5/5): ffmpeg encerrou inesperadamente: exit status 8
+🚨 [Camera 2 - camera2] Muitos erros consecutivos, aguardando 30s...
+[DEBUG][Camera 1] FFmpeg segment muxer: segmentCount=6 segmentTime=15s goroutines=16
+[DEBUG][Camera 1] FFmpeg iniciado PID=2005
+❌ [Camera 1 - camera1] Erro na gravação (5/5): ffmpeg encerrou inesperad

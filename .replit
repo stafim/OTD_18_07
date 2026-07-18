@@ -1,0 +1,70 @@
+modules = ["nodejs-20", "web", "bash", "python-3.11", "postgresql-16"]
+run = "npm run dev"
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+
+[nix]
+channel = "stable-25_05"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5904
+externalPort = 3000
+
+[[ports]]
+localPort = 23636
+externalPort = 3002
+
+[env]
+PORT = "5000"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "./dist/index.cjs"]
+build = ["npm", "run", "build"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[agent]
+integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0"]
+expertMode = true
+stack = "FULLSTACK_JS"
+
+[userenv]
+
+[userenv.shared]
+PRIVATE_OBJECT_DIR = "/replit-objstore-6a84ff3c-f950-4d12-a319-16a60993a7f1/private"
+PUBLIC_OBJECT_SEARCH_PATHS = "/replit-objstore-6a84ff3c-f950-4d12-a319-16a60993a7f1/public"
+GOOGLE_MAPS_API_KEY = "AIzaSyCQTx6S1yTTvlBMvLsoy4AzytRFi7ZlMI4"
+VITE_GOOGLE_MAPS_API_KEY = "AIzaSyCQTx6S1yTTvlBMvLsoy4AzytRFi7ZlMI4"
+SMTP_PORT = "587"
+JWT_ACCESS_SECRET = "5ea028f14eac13174aa76566b12fbd648232032461cc5c04a520ff899073ae7e6d5e8e5c6193c6cb93c04e7d10895f3d3073e9ef70b0c49d4eb90cb4f331b784"
+JWT_REFRESH_SECRET = "1065e13592e7bc3deaf6f949555e573fc6948725c02ce93d8e6a81c8e5a13d07925eb1135b193e78b95a29443282c3b415e615b4dd31901ad73a8556c71a7231"
+JWT_CLIENT_SECRET = "b15c887749742903bd9a2d2cee9f49a255ecd131d34fc8a77f8ae6af10d08bd98a6b4e9152a6bc661964fe272a043849d5e37da750e8921665431c1f709acef5"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-6a84ff3c-f950-4d12-a319-16a60993a7f1"
