@@ -45,6 +45,8 @@ import {
   UserX,
   Link2Off,
   Phone,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -265,7 +267,7 @@ export function DriverDocsDialog({
   const [uploadingField, setUploadingField] = useState<PhotoField | null>(null);
   const [selectedContractId, setSelectedContractId] = useState<string>("");
   const [sendingContractId, setSendingContractId] = useState<string | null>(null);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
   const [pendingActiveState, setPendingActiveState] = useState<boolean | null>(null);
   const [reasonText, setReasonText] = useState("");
@@ -463,7 +465,38 @@ export function DriverDocsDialog({
 
   const isLoading = driverLoading || contractsLoading;
 
+  // Ordered list of all available photos for lightbox navigation
   const d = driver as any;
+  const lightboxImages: { src: string; label: string }[] = driver ? [
+    ...(driver.profilePhoto        ? [{ src: driver.profilePhoto,       label: "Foto de Perfil" }]            : []),
+    ...(driver.cnhFrontPhoto       ? [{ src: driver.cnhFrontPhoto,      label: "CNH — Frente" }]              : []),
+    ...(driver.cnhBackPhoto        ? [{ src: driver.cnhBackPhoto,       label: "CNH — Verso" }]               : []),
+    ...(d.rgPhoto                  ? [{ src: d.rgPhoto,                 label: "RG" }]                        : []),
+    ...(d.addressProofPhoto        ? [{ src: d.addressProofPhoto,       label: "Comprovante de Residência" }] : []),
+  ] : [];
+
+  const openLightbox = (src: string) => {
+    const idx = lightboxImages.findIndex((img) => img.src === src);
+    if (idx >= 0) setLightboxIndex(idx);
+  };
+
+  const closeLightbox = () => setLightboxIndex(null);
+  const goPrev = () => setLightboxIndex((i) => (i !== null && i > 0 ? i - 1 : i));
+  const goNext = () => setLightboxIndex((i) => (i !== null && i < lightboxImages.length - 1 ? i + 1 : i));
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape")     { e.stopPropagation(); closeLightbox(); }
+      if (e.key === "ArrowLeft")  { e.stopPropagation(); goPrev(); }
+      if (e.key === "ArrowRight") { e.stopPropagation(); goNext(); }
+    };
+    window.addEventListener("keydown", onKey, true); // capture = true to beat Radix
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [lightboxIndex, lightboxImages.length]);
+
+  const d2 = driver as any;
   const missingDocs: string[] = [];
   if (d) {
     if (!d.cnhFrontPhoto) missingDocs.push("CNH Frente");
@@ -473,7 +506,7 @@ export function DriverDocsDialog({
     const hasActiveContract = driverContracts.some((c) => c.status === "ativo");
     if (!hasActiveContract) missingDocs.push("Contrato ativo");
   }
-  const isApto = d?.isApto === "true";
+  const isApto = d2?.isApto === "true";
 
   // WhatsApp click-to-chat link (mesma convenção da listagem de motoristas):
   // se começar com "+", já é E.164; senão assume Brasil e prefixa 55 quando faltar.
@@ -492,8 +525,20 @@ export function DriverDocsDialog({
   const waUrl = `https://wa.me/${waNumber}`;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && lightboxIndex !== null) { setLightboxIndex(null); return; }
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => { if (lightboxIndex !== null) e.preventDefault(); }}
+        onPointerDownOutside={(e) => { if (lightboxIndex !== null) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (lightboxIndex !== null) { e.preventDefault(); setLightboxIndex(null); } }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
@@ -687,7 +732,7 @@ export function DriverDocsDialog({
                           src={driver.profilePhoto}
                           alt="Foto de Perfil"
                           className="h-24 w-24 rounded-full object-cover border-2 border-muted cursor-zoom-in"
-                          onClick={() => setLightboxSrc(driver.profilePhoto!)}
+                          onClick={() => openLightbox(driver.profilePhoto!)}
                           data-testid="img-profile-photo-docs"
                         />
                         <button
@@ -697,7 +742,7 @@ export function DriverDocsDialog({
                               .getElementById("profile-upload-docs")
                               ?.click()
                           }
-                          className="absolute inset-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-black/30"
+                          className="absolute inset-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 pointer-events-none group-hover:pointer-events-auto"
                         >
                           <Camera className="h-5 w-5 text-white" />
                         </button>
@@ -771,7 +816,7 @@ export function DriverDocsDialog({
                       onUpload={(f) => handleUpload(f, "cnhFrontPhoto")}
                       onRemove={() => handleRemove("cnhFrontPhoto")}
                       testId="cnh-front"
-                      onExpand={setLightboxSrc}
+                      onExpand={openLightbox}
                     />
                     {/* CNH Verso */}
                     <DocUploadCell
@@ -783,7 +828,7 @@ export function DriverDocsDialog({
                       onUpload={(f) => handleUpload(f, "cnhBackPhoto")}
                       onRemove={() => handleRemove("cnhBackPhoto")}
                       testId="cnh-back"
-                      onExpand={setLightboxSrc}
+                      onExpand={openLightbox}
                     />
                     {/* RG */}
                     <DocUploadCell
@@ -795,7 +840,7 @@ export function DriverDocsDialog({
                       onUpload={(f) => handleUpload(f, "rgPhoto")}
                       onRemove={() => handleRemove("rgPhoto")}
                       testId="rg"
-                      onExpand={setLightboxSrc}
+                      onExpand={openLightbox}
                     />
                     {/* Comprovante de Residência */}
                     <DocUploadCell
@@ -807,7 +852,7 @@ export function DriverDocsDialog({
                       onUpload={(f) => handleUpload(f, "addressProofPhoto")}
                       onRemove={() => handleRemove("addressProofPhoto")}
                       testId="address-proof"
-                      onExpand={setLightboxSrc}
+                      onExpand={openLightbox}
                     />
                   </div>
                 </div>
@@ -1057,6 +1102,71 @@ export function DriverDocsDialog({
             </div>
           </div>
         )}
+
+        {/* ── Lightbox ── inside DialogContent so Radix events are not blocked */}
+        {lightboxIndex !== null && lightboxImages[lightboxIndex] && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+            onClick={closeLightbox}
+            data-testid="lightbox-overlay"
+          >
+            {/* Close */}
+            <button
+              type="button"
+              className="absolute top-4 right-4 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/30 text-white transition-colors"
+              onClick={(e) => { e.stopPropagation(); closeLightbox(); }}
+              data-testid="button-close-lightbox"
+              aria-label="Fechar"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {/* Label + counter */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full select-none pointer-events-none">
+              {lightboxImages[lightboxIndex].label}
+              {lightboxImages.length > 1 && (
+                <span className="ml-2 text-white/50 text-xs">
+                  {lightboxIndex + 1} / {lightboxImages.length}
+                </span>
+              )}
+            </div>
+
+            {/* Prev */}
+            {lightboxIndex > 0 && (
+              <button
+                type="button"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/30 text-white transition-colors"
+                onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                data-testid="button-lightbox-prev"
+                aria-label="Imagem anterior"
+              >
+                <ChevronLeft className="h-7 w-7" />
+              </button>
+            )}
+
+            {/* Image */}
+            <img
+              src={lightboxImages[lightboxIndex].src}
+              alt={lightboxImages[lightboxIndex].label}
+              className="max-h-[85vh] max-w-[85vw] rounded-xl object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              data-testid="img-lightbox"
+            />
+
+            {/* Next */}
+            {lightboxIndex < lightboxImages.length - 1 && (
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/30 text-white transition-colors"
+                onClick={(e) => { e.stopPropagation(); goNext(); }}
+                data-testid="button-lightbox-next"
+                aria-label="Próxima imagem"
+              >
+                <ChevronRight className="h-7 w-7" />
+              </button>
+            )}
+          </div>
+        )}
       </DialogContent>
 
       {/* Dialog de motivo de ativação/desativação */}
@@ -1112,30 +1222,8 @@ export function DriverDocsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox overlay */}
-      {lightboxSrc && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
-          onClick={() => setLightboxSrc(null)}
-          data-testid="lightbox-overlay"
-        >
-          <button
-            className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/40 rounded-full p-2 transition-colors"
-            onClick={() => setLightboxSrc(null)}
-            data-testid="button-close-lightbox"
-          >
-            <X className="h-6 w-6" />
-          </button>
-          <img
-            src={lightboxSrc}
-            alt="Visualização ampliada"
-            className="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            data-testid="img-lightbox"
-          />
-        </div>
-      )}
     </Dialog>
+    </>
   );
 }
 

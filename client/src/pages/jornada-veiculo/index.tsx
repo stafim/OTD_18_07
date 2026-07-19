@@ -901,12 +901,14 @@ export default function JornadaVeiculoPage() {
 
       // ── Stats bar — mirrors the 4-cell stats row ───────────────────────
       // Coletas | Transportes | Transferências | Distância Aprox.
-      // Approx = collect km + registered route km (from route management).
-      const pdfCollectsKm = journeyDistances?.totals?.collectsKm ?? 0;
-      const pdfRouteKm = journeyDistances?.totals?.transportsRouteKm
-        ?? journeyDistances?.totals?.transportsPlannedKm
-        ?? journey.transports.reduce((s, t) => s + (parseFloat(String(t.routeDistanceKm ?? 0)) || 0), 0);
-      const totalDist = pdfCollectsKm + pdfRouteKm;
+      // Total = coletas + transferências + transportes (GPS realizado > rota planejada > route management)
+      const pdfCollectsKm   = journeyDistances?.totals?.collectsKm   ?? 0;
+      const pdfTransfersKm  = journeyDistances?.totals?.transfersKm  ?? 0;
+      const pdfTransportsKm = journeyDistances?.totals?.transportsRealizedKm
+        || journeyDistances?.totals?.transportsRouteKm
+        || journeyDistances?.totals?.transportsPlannedKm
+        || journey.transports.reduce((s, t) => s + (parseFloat(String(t.routeDistanceKm ?? 0)) || 0), 0);
+      const totalDist = pdfCollectsKm + pdfTransfersKm + pdfTransportsKm;
       const distLabel = totalDist > 0
         ? `${totalDist.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`
         : "—";
@@ -1857,11 +1859,13 @@ export default function JornadaVeiculoPage() {
                   ))}
                   {/* Distance breakdown cell */}
                   {(() => {
-                    const collectsKm = journeyDistances?.totals?.collectsKm ?? 0;
-                    const routeKm = journeyDistances?.totals?.transportsRouteKm
-                      ?? journeyDistances?.totals?.transportsPlannedKm
-                      ?? journey.transports.reduce((s, t) => s + (parseFloat(String(t.routeDistanceKm ?? 0)) || 0), 0);
-                    const total = collectsKm + routeKm;
+                    const collectsKm  = journeyDistances?.totals?.collectsKm  ?? 0;
+                    const transfersKm = journeyDistances?.totals?.transfersKm ?? 0;
+                    const transportsKm = journeyDistances?.totals?.transportsRealizedKm
+                      || journeyDistances?.totals?.transportsRouteKm
+                      || journeyDistances?.totals?.transportsPlannedKm
+                      || journey.transports.reduce((s, t) => s + (parseFloat(String(t.routeDistanceKm ?? 0)) || 0), 0);
+                    const total = collectsKm + transfersKm + transportsKm;
                     const fmtN = (n: number) => n > 0 ? n.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : null;
                     return (
                       <div className="px-4 py-3.5 text-center">
@@ -1875,8 +1879,11 @@ export default function JornadaVeiculoPage() {
                             {collectsKm > 0 && (
                               <p className="text-[9px] text-muted-foreground">Coleta: {fmtN(collectsKm)} km</p>
                             )}
-                            {routeKm > 0 && (
-                              <p className="text-[9px] text-muted-foreground">Rota: {fmtN(routeKm)} km</p>
+                            {transfersKm > 0 && (
+                              <p className="text-[9px] text-muted-foreground">Transferência: {fmtN(transfersKm)} km</p>
+                            )}
+                            {transportsKm > 0 && (
+                              <p className="text-[9px] text-muted-foreground">Transporte: {fmtN(transportsKm)} km</p>
                             )}
                           </div>
                         )}

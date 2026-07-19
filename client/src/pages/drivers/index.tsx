@@ -6,7 +6,7 @@ import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Eye, BarChart2, FolderOpen, FileX, Smartphone, Monitor } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, BarChart2, FolderOpen, FileX, Smartphone, Monitor, RefreshCw } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -43,7 +43,7 @@ export default function DriversPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const { data: drivers, isLoading } = useQuery<Driver[]>({
+  const { data: drivers, isLoading, refetch, isFetching } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
   });
 
@@ -277,6 +277,18 @@ export default function DriversPage() {
           { label: "Cadastros", href: "/" },
           { label: "Motoristas" },
         ]}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh-drivers"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+        }
       />
       <div className="flex-1 overflow-auto p-4 md:p-6">
         <div className="mb-4 flex flex-col gap-3">

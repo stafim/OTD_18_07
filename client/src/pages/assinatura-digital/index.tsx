@@ -21,6 +21,7 @@ import {
   MailCheck,
   Users,
   History,
+  RefreshCw,
 } from "lucide-react";
 
 interface AutentiqueDocument {
@@ -535,19 +536,28 @@ export default function AssinaturaDigitalPage() {
   const [sendTarget, setSendTarget] = useState<{ id: string; label: string; type: "contract" | "freight"; initialDriverId?: string } | null>(null);
   const [contractPickerOpen, setContractPickerOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
+  const [signatureFilter, setSignatureFilter] = useState<"all" | "signed" | "unsigned">("all");
   const [historyTarget, setHistoryTarget] = useState<{ contractId: string; driverId: string; driverName: string; contractLabel: string } | null>(null);
 
-  const { data: docsData } = useQuery<{ total: number; data: AutentiqueDocument[] }>({
+  const { data: docsData, refetch: refetchDocs, isFetching: fetchingDocs } = useQuery<{ total: number; data: AutentiqueDocument[] }>({
     queryKey: ["/api/autentique/documents"],
   });
 
-  const { data: contractsData } = useQuery<Contract[]>({
+  const { data: contractsData, refetch: refetchContracts, isFetching: fetchingContracts } = useQuery<Contract[]>({
     queryKey: ["/api/contracts"],
   });
 
-  const { data: allDriversData } = useQuery<DriverOption[]>({
+  const { data: allDriversData, refetch: refetchDrivers, isFetching: fetchingDrivers } = useQuery<DriverOption[]>({
     queryKey: ["/api/drivers"],
   });
+
+  const isFetching = fetchingDocs || fetchingContracts || fetchingDrivers;
+
+  function handleRefresh() {
+    refetchDocs();
+    refetchContracts();
+    refetchDrivers();
+  }
 
   const resendMutation = useMutation({
     mutationFn: async (docId: string) => apiRequest("POST", `/api/autentique/resend/${docId}`),
@@ -667,11 +677,20 @@ export default function AssinaturaDigitalPage() {
     ? Math.round((uniqueDriversSigned / totalDriversInBase) * 100)
     : 0;
 
-  // Apply filter by driver name (case-insensitive)
+  // Apply filter by driver name (case-insensitive) + signature status
   const normalizedSearch = driverSearch.trim().toLowerCase();
-  const filteredRows = normalizedSearch
-    ? sentRows.filter((r) => r.driverName.toLowerCase().includes(normalizedSearch))
-    : sentRows;
+  const filteredRows = sentRows.filter((r) => {
+    const matchesSearch = !normalizedSearch || r.driverName.toLowerCase().includes(normalizedSearch);
+    const isSigned = !!r.signedAt || r.status === "assinado";
+    const matchesSignature =
+      signatureFilter === "all" ||
+      (signatureFilter === "signed" && isSigned) ||
+      (signatureFilter === "unsigned" && !isSigned);
+    return matchesSearch && matchesSignature;
+  });
+
+  const signedCount = sentRows.filter((r) => !!r.signedAt || r.status === "assinado").length;
+  const unsignedCount = sentRows.length - signedCount;
 
   const formatDateTime = (iso?: string | null) => {
     if (!iso) return "—";
@@ -696,10 +715,20 @@ export default function AssinaturaDigitalPage() {
         <div className="p-2 bg-primary/10 rounded-lg">
           <PenLine className="h-6 w-6 text-primary" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Assinatura Digital</h1>
           <p className="text-muted-foreground text-sm">Integração com Autentique — envie e monitore contratos para assinatura eletrônica</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          data-testid="button-refresh-assinatura"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+          Atualizar
+        </Button>
       </div>
 
       {/* SUMMARY CARDS */}
@@ -754,28 +783,72 @@ export default function AssinaturaDigitalPage() {
       {/* DRIVER CONTRACTS */}
       <div>
           {/* Action bar */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-            <div className="flex-1 max-w-md">
-              <Input
-                placeholder="Buscar motorista por nome..."
-                value={driverSearch}
-                onChange={(e) => setDriverSearch(e.target.value)}
-                data-testid="input-search-driver"
-              />
+          <div className="flex flex-col gap-3 mb-5">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="flex-1 max-w-md">
+                <Input
+                  placeholder="Buscar motorista por nome..."
+                  value={driverSearch}
+                  onChange={(e) => setDriverSearch(e.target.value)}
+                  data-testid="input-search-driver"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {(normalizedSearch || signatureFilter !== "all")
+                    ? `${filteredRows.length} de ${sentRows.length} envio(s)`
+                    : `${sentRows.length} envio(s) registrado(s)`}
+                  {pendingContracts.length > 0 && ` · ${pendingContracts.length} contrato(s) ainda não enviado(s)`}
+                </p>
+                <Button
+                  onClick={() => setContractPickerOpen(true)}
+                  data-testid="button-new-send-contract"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Enviar Contrato
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-muted-foreground">
-                {normalizedSearch
-                  ? `${filteredRows.length} de ${sentRows.length} envio(s)`
-                  : `${sentRows.length} envio(s) registrado(s)`}
-                {pendingContracts.length > 0 && ` · ${pendingContracts.length} contrato(s) ainda não enviado(s)`}
-              </p>
+
+            {/* Filter chips */}
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
-                onClick={() => setContractPickerOpen(true)}
-                data-testid="button-new-send-contract"
+                size="sm"
+                variant={signatureFilter === "all" ? "default" : "outline"}
+                onClick={() => setSignatureFilter("all")}
+                className="h-8 rounded-full px-4 text-xs"
+                data-testid="filter-signature-all"
               >
-                <Send className="h-4 w-4 mr-2" />
-                Enviar Contrato
+                Todos
+                <span className="ml-1.5 rounded-full bg-background/20 px-1.5 py-0.5 text-xs font-semibold">
+                  {sentRows.length}
+                </span>
+              </Button>
+              <Button
+                size="sm"
+                variant={signatureFilter === "signed" ? "default" : "outline"}
+                onClick={() => setSignatureFilter("signed")}
+                className={`h-8 rounded-full px-4 text-xs ${signatureFilter === "signed" ? "" : "text-green-600 border-green-600/40 hover:border-green-600"}`}
+                data-testid="filter-signature-signed"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                Com contrato assinado
+                <span className="ml-1.5 rounded-full bg-background/20 px-1.5 py-0.5 text-xs font-semibold">
+                  {signedCount}
+                </span>
+              </Button>
+              <Button
+                size="sm"
+                variant={signatureFilter === "unsigned" ? "default" : "outline"}
+                onClick={() => setSignatureFilter("unsigned")}
+                className={`h-8 rounded-full px-4 text-xs ${signatureFilter === "unsigned" ? "" : "text-amber-600 border-amber-600/40 hover:border-amber-600"}`}
+                data-testid="filter-signature-unsigned"
+              >
+                <Clock className="h-3.5 w-3.5 mr-1.5" />
+                Sem contrato assinado
+                <span className="ml-1.5 rounded-full bg-background/20 px-1.5 py-0.5 text-xs font-semibold">
+                  {unsignedCount}
+                </span>
               </Button>
             </div>
           </div>

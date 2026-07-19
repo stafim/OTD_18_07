@@ -94,7 +94,19 @@ const driverFormSchema = z.object({
     return data.password === data.confirmPassword;
   }
   return true;
-}, { message: "As senhas não coincidem", path: ["confirmPassword"] });
+}, { message: "As senhas não coincidem", path: ["confirmPassword"] })
+  .refine((data) => {
+    if (data.modality === "pj") {
+      return !!(data.cnpj && data.cnpj.trim().length > 0);
+    }
+    return true;
+  }, { message: "CNPJ é obrigatório para modalidade PJ", path: ["cnpj"] })
+  .refine((data) => {
+    if (data.modality === "pj") {
+      return !!(data.companyName && data.companyName.trim().length > 0);
+    }
+    return true;
+  }, { message: "Razão Social é obrigatória para modalidade PJ", path: ["companyName"] });
 
 type DriverFormData = z.infer<typeof driverFormSchema>;
 
@@ -236,6 +248,9 @@ export default function DriverFormPage() {
       confirmPassword: "",
     },
   });
+
+  const watchedModality = form.watch("modality");
+  const isPJ = watchedModality === "pj";
 
   const { data: userAccount } = useQuery<{ exists: boolean; email: string | null; username?: string; isActive?: string }>({
     queryKey: ["/api/drivers", id, "user-account"],
@@ -636,7 +651,7 @@ export default function DriverFormPage() {
                       name="cnpj"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5 text-muted-foreground" />CNPJ</FormLabel>
+                          <FormLabel className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5 text-muted-foreground" />CNPJ{isPJ && <span className="text-destructive ml-0.5">*</span>}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -656,7 +671,7 @@ export default function DriverFormPage() {
                       name="companyName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5 text-muted-foreground" />Razão Social</FormLabel>
+                          <FormLabel className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5 text-muted-foreground" />Razão Social{isPJ && <span className="text-destructive ml-0.5">*</span>}</FormLabel>
                           <FormControl>
                             <Input {...field} value={field.value ?? ""} placeholder="Razão Social da empresa" data-testid="input-driver-company-name" />
                           </FormControl>

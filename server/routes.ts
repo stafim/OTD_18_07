@@ -5086,8 +5086,10 @@ export async function registerRoutes(
         const plannedKm = t.routeDistanceKm ? parseFloat(String(t.routeDistanceKm)) : null;
 
         // Look up the registered distanceKm from route management
+        // Priority: client-delivery route → yard-to-yard route → linked proposal distanceKm
         let routeKm: number | null = null;
         if (t.originYardId && t.deliveryLocationId) {
+          // transport → client delivery location
           const [route] = await db.select({ distanceKm: routes.distanceKm })
             .from(routes)
             .where(and(
@@ -5100,13 +5102,46 @@ export async function registerRoutes(
             if (!isNaN(parsed)) routeKm = parsed;
           }
         }
+        if (routeKm == null && t.originYardId && (t as any).destinationYardId) {
+          // yard-to-yard transport — look up route by destination yard
+          const [yardRoute] = await db.select({ distanceKm: routes.distanceKm })
+            .from(routes)
+            .where(and(
+              eq(routes.originYardId, t.originYardId),
+              drizzleSql`${routes.destinationYardId} = ${(t as any).destinationYardId}`,
+            ))
+            .limit(1);
+          if (yardRoute?.distanceKm) {
+            const parsed = parseFloat(String(yardRoute.distanceKm));
+            if (!isNaN(parsed)) routeKm = parsed;
+          }
+        }
+        // Last resort: use the linked proposal's distanceKm (covers yard-to-yard without
+        // a saved route and any transport where routeDistanceKm was never populated)
+        let proposalKm: number | null = null;
+        if (plannedKm == null && routeKm == null && !r?.km) {
+          const [propItem] = await db.select({ proposalId: transportProposalItems.proposalId })
+            .from(transportProposalItems)
+            .where(eq(transportProposalItems.transportId, t.id))
+            .limit(1);
+          if (propItem?.proposalId) {
+            const [prop] = await db.select({ distanceKm: transportProposals.distanceKm })
+              .from(transportProposals)
+              .where(eq(transportProposals.id, propItem.proposalId))
+              .limit(1);
+            if (prop?.distanceKm) {
+              const parsed = parseFloat(String(prop.distanceKm));
+              if (!isNaN(parsed)) proposalKm = parsed;
+            }
+          }
+        }
 
         return {
           id: t.id,
-          plannedKm: plannedKm != null && !isNaN(plannedKm) ? plannedKm : null,
+          plannedKm: plannedKm != null && !isNaN(plannedKm) ? plannedKm : proposalKm,
           routeKm,
           realizedKm: r?.km ?? null,
-          source: r?.source ?? "none",
+          source: r?.source ?? (proposalKm != null ? "proposal" : "none"),
         };
       }));
 
@@ -8842,15 +8877,10 @@ export async function registerRoutes(
         body.cnpj = cnpjTrimmed === "" ? undefined : cnpjTrimmed;
       }
 
-      // RG (obrigatório): trim e converte string vazia em undefined para o guard de obrigatoriedade abaixo
+      // RG (opcional): trim e normaliza string vazia para undefined
       if (typeof body.rg === "string") {
         const rgTrimmed = body.rg.trim();
         body.rg = rgTrimmed === "" ? undefined : rgTrimmed;
-      }
-
-      // RG é obrigatório no cadastro externo (após a normalização acima, body.rg é undefined quando vazio)
-      if (!body.rg) {
-        return res.status(400).json({ message: "O campo 'rg' (RG) é obrigatório" });
       }
 
       // Validate required fields: email and password are mandatory for external registration

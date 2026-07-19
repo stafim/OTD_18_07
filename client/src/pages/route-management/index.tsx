@@ -32,7 +32,11 @@ import {
   X,
   Search,
   GripVertical,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+
+const PAGE_SIZE = 10;
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import type { Yard, Client, DeliveryLocation } from "@shared/schema";
@@ -183,6 +187,8 @@ export default function RouteManagementPage() {
   const [calculatingKm, setCalculatingKm] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [costMode, setCostMode] = useState<CostMode>("detailed");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   // Waypoints state
@@ -603,6 +609,28 @@ export default function RouteManagementPage() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // ── Filtering + pagination ──────────────────────────────────────────────
+  const filteredRoutes = (routesList ?? []).filter((r) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      (r.originYard?.name ?? "").toLowerCase().includes(q) ||
+      (r.destinationLocation?.name ?? "").toLowerCase().includes(q) ||
+      (r.destinationYard?.name ?? "").toLowerCase().includes(q) ||
+      (r.client?.name ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredRoutes.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedRoutes = filteredRoutes.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function handleSearch(value: string) {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }
+
   return (
     <div className="flex flex-col">
       <PageHeader
@@ -613,7 +641,18 @@ export default function RouteManagementPage() {
         ]}
       />
       <div className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="mb-4 flex justify-end">
+        {/* Toolbar: search + new button */}
+        <div className="mb-4 flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar por nome, pátio, cliente..."
+              className="pl-9"
+              data-testid="input-search-routes"
+            />
+          </div>
           <Button onClick={openCreate} data-testid="button-new-route">
             <Plus className="mr-2 h-4 w-4" />
             Nova Rota
@@ -634,114 +673,184 @@ export default function RouteManagementPage() {
               Criar primeira rota
             </Button>
           </div>
-        ) : (
-          <div className="rounded-lg border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nome</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Pátio de Origem</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Cliente</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Local de Entrega</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Distância</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Custo Total</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {routesList.map((route, idx) => (
-                  <tr
-                    key={route.id}
-                    className={`border-t transition-colors hover:bg-muted/30 ${idx % 2 === 0 ? "" : "bg-muted/10"}`}
-                    data-testid={`row-route-${route.id}`}
-                  >
-                    <td className="px-4 py-3 font-medium">
-                      <div className="flex items-center gap-2">
-                        <Route className="h-4 w-4 text-primary shrink-0" />
-                        {route.name}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5 shrink-0" />
-                        {route.originYard?.name ?? "-"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <User className="h-3.5 w-3.5 shrink-0" />
-                        {route.destinationType === "yard" ? (
-                          <span className="text-xs italic">— pátio —</span>
-                        ) : (
-                          route.client?.name ?? "-"
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {route.destinationType === "yard" ? (
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
-                          <span className="font-medium text-foreground">{route.destinationYard?.name ?? "-"}</span>
-                          {route.destinationYard?.city
-                            ? <span className="text-xs"> — {route.destinationYard.city}/{route.destinationYard.state}</span>
-                            : ""}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          {route.destinationLocation?.name ?? "-"}
-                          {route.destinationLocation?.city
-                            ? ` — ${route.destinationLocation.city}/${route.destinationLocation.state}`
-                            : ""}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {route.distanceKm ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                          <Navigation className="h-3.5 w-3.5" />
-                          {parseFloat(route.distanceKm).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getDisplayTotal(route) ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 dark:text-green-400">
-                          <DollarSign className="h-3.5 w-3.5" />
-                          {getDisplayTotal(route)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openEdit(route)}
-                          data-testid={`button-edit-route-${route.id}`}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteId(route.id)}
-                          data-testid={`button-delete-route-${route.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        ) : filteredRoutes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+            <Search className="h-10 w-10 opacity-20" />
+            <p className="text-sm">Nenhuma rota encontrada para "{searchQuery}".</p>
+            <Button variant="outline" size="sm" onClick={() => handleSearch("")}>Limpar busca</Button>
           </div>
+        ) : (
+          <>
+            <div className="rounded-lg border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nome</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Pátio de Origem</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Cliente</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Local de Entrega</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Distância</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Custo Total</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRoutes.map((route, idx) => (
+                    <tr
+                      key={route.id}
+                      className={`border-t transition-colors hover:bg-muted/30 ${idx % 2 === 0 ? "" : "bg-muted/10"}`}
+                      data-testid={`row-route-${route.id}`}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        <div className="flex items-center gap-2">
+                          <Route className="h-4 w-4 text-primary shrink-0" />
+                          {route.name}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Building2 className="h-3.5 w-3.5 shrink-0" />
+                          {route.originYard?.name ?? "-"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <User className="h-3.5 w-3.5 shrink-0" />
+                          {route.destinationType === "yard" ? (
+                            <span className="text-xs italic">— pátio —</span>
+                          ) : (
+                            route.client?.name ?? "-"
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {route.destinationType === "yard" ? (
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                            <span className="font-medium text-foreground">{route.destinationYard?.name ?? "-"}</span>
+                            {route.destinationYard?.city
+                              ? <span className="text-xs"> — {route.destinationYard.city}/{route.destinationYard.state}</span>
+                              : ""}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" />
+                            {route.destinationLocation?.name ?? "-"}
+                            {route.destinationLocation?.city
+                              ? ` — ${route.destinationLocation.city}/${route.destinationLocation.state}`
+                              : ""}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {route.distanceKm ? (
+                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                            <Navigation className="h-3.5 w-3.5" />
+                            {parseFloat(route.distanceKm).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {getDisplayTotal(route) ? (
+                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 dark:text-green-400">
+                            <DollarSign className="h-3.5 w-3.5" />
+                            {getDisplayTotal(route)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEdit(route)}
+                            data-testid={`button-edit-route-${route.id}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteId(route.id)}
+                            data-testid={`button-delete-route-${route.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Exibindo{" "}
+                  <span className="font-medium text-foreground">
+                    {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredRoutes.length)}
+                  </span>{" "}
+                  de{" "}
+                  <span className="font-medium text-foreground">{filteredRoutes.length}</span> rotas
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={safePage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  {/* Page number pills */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                    .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("…");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((item, i) =>
+                      item === "…" ? (
+                        <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground select-none">…</span>
+                      ) : (
+                        <Button
+                          key={item}
+                          variant={item === safePage ? "default" : "outline"}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCurrentPage(item as number)}
+                          data-testid={`button-page-${item}`}
+                        >
+                          {item}
+                        </Button>
+                      )
+                    )}
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={safePage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    data-testid="button-next-page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -325,6 +325,7 @@ export default function TransportFormPage() {
 
   const [appliedRouteId, setAppliedRouteId] = useState<string | null>(null);
   const [pendingDeliveryLocationId, setPendingDeliveryLocationId] = useState<string | null>(null);
+  const [routePopoverOpen, setRoutePopoverOpen] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -374,6 +375,12 @@ export default function TransportFormPage() {
   const vehicleChassiWatched = form.watch("vehicleChassi");
   const selectedVehicleData = vehicles?.find(v => v.chassi === vehicleChassiWatched);
   const vehicleCurrentYardId = selectedVehicleData?.yardId ?? null;
+  const filteredRoutes = vehicleCurrentYardId
+    ? savedRoutes.filter(r => r.originYardId === vehicleCurrentYardId)
+    : savedRoutes;
+  const routeOriginYardName = vehicleCurrentYardId
+    ? yards?.find(y => y.id === vehicleCurrentYardId)?.name
+    : null;
 
   const { data: deliveryLocations } = useQuery<DeliveryLocation[]>({
     queryKey: ["/api/clients", clientId, "locations"],
@@ -814,73 +821,91 @@ export default function TransportFormPage() {
                           <XCircle className="h-4 w-4" />
                         </button>
                       </div>
-                    ) : (() => {
-                      // Only show routes that start at the vehicle's current yard
-                      const filteredRoutes = vehicleCurrentYardId
-                        ? savedRoutes.filter(r => r.originYardId === vehicleCurrentYardId)
-                        : [];
-                      const originYardName = vehicleCurrentYardId
-                        ? yards?.find(y => y.id === vehicleCurrentYardId)?.name
-                        : null;
-
-                      return (
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
-                            <Route className="h-3.5 w-3.5" />
-                            Definir via rota salva
-                            {originYardName && (
-                              <span className="text-xs font-normal">
-                                — pátio de origem: <span className="font-semibold text-foreground">{originYardName}</span>
-                              </span>
-                            )}
-                          </label>
-
-                          {!vehicleCurrentYardId ? (
-                            <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
-                              <Warehouse className="h-4 w-4 shrink-0" />
-                              Selecione um chassi primeiro para ver as rotas disponíveis a partir do seu pátio atual.
-                            </div>
-                          ) : filteredRoutes.length === 0 ? (
-                            <div className="flex items-center gap-2 rounded-md border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
-                              <Route className="h-4 w-4 shrink-0" />
-                              Nenhuma rota cadastrada com origem em <span className="font-semibold mx-1">{originYardName}</span>. Preencha os campos manualmente.
-                            </div>
-                          ) : (
-                            <Select onValueChange={(id) => {
-                              const route = filteredRoutes.find(r => r.id === id);
-                              if (route) applyRoute(route);
-                            }}>
-                              <SelectTrigger className="h-10" data-testid="select-route">
-                                <SelectValue placeholder="Selecione uma rota para preencher automaticamente…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {filteredRoutes.map(route => (
-                                  <SelectItem key={route.id} value={route.id}>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{route.name}</span>
-                                      <span className="text-xs text-muted-foreground flex items-center gap-2">
-                                        {route.client?.name && (
-                                          <span className="flex items-center gap-1">
-                                            <Building2 className="h-3 w-3" />
-                                            {route.client.name}
-                                          </span>
-                                        )}
-                                        {route.destinationLocation && (
-                                          <span className="flex items-center gap-1">
-                                            <MapPin className="h-3 w-3" />
-                                            {route.destinationLocation.name} – {route.destinationLocation.city}/{route.destinationLocation.state}
-                                          </span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+                          <Route className="h-3.5 w-3.5" />
+                          Definir via rota salva
+                          {routeOriginYardName && (
+                            <span className="text-xs font-normal">
+                              — pátio de origem: <span className="font-semibold text-foreground">{routeOriginYardName}</span>
+                            </span>
                           )}
-                        </div>
-                      );
-                    })()}
+                        </label>
+
+                        {!vehicleCurrentYardId ? (
+                          <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
+                            <Warehouse className="h-4 w-4 shrink-0" />
+                            Selecione um chassi primeiro para ver as rotas disponíveis a partir do seu pátio atual.
+                          </div>
+                        ) : filteredRoutes.length === 0 ? (
+                          <div className="flex items-center gap-2 rounded-md border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+                            <Route className="h-4 w-4 shrink-0" />
+                            Nenhuma rota cadastrada com origem em <span className="font-semibold mx-1">{routeOriginYardName}</span>. Preencha os campos manualmente.
+                          </div>
+                        ) : (
+                          <Popover open={routePopoverOpen} onOpenChange={setRoutePopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                data-testid="select-route"
+                                className={cn(
+                                  "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+                                  "hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                                )}
+                              >
+                                <span className="text-muted-foreground truncate">
+                                  Selecione uma rota para preencher automaticamente…
+                                </span>
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[480px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar rota…" />
+                                <CommandList>
+                                  <CommandEmpty>Nenhuma rota encontrada.</CommandEmpty>
+                                  <CommandGroup>
+                                    {filteredRoutes.map(route => (
+                                      <CommandItem
+                                        key={route.id}
+                                        value={[
+                                          route.name,
+                                          route.client?.name,
+                                          route.destinationLocation?.name,
+                                          route.destinationLocation?.city,
+                                        ].filter(Boolean).join(" ")}
+                                        onSelect={() => {
+                                          applyRoute(route);
+                                          setRoutePopoverOpen(false);
+                                        }}
+                                        className="flex flex-col items-start gap-0.5 py-2"
+                                      >
+                                        <span className="font-medium">{route.name}</span>
+                                        <span className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                                          {route.client?.name && (
+                                            <span className="flex items-center gap-1">
+                                              <Building2 className="h-3 w-3" />
+                                              {route.client.name}
+                                            </span>
+                                          )}
+                                          {route.destinationLocation && (
+                                            <span className="flex items-center gap-1">
+                                              <MapPin className="h-3 w-3" />
+                                              {route.destinationLocation.name} – {route.destinationLocation.city}/{route.destinationLocation.state}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
+                    )}
                     {/* Map preview — visible only when a route is applied */}
                     {appliedRouteId && apiKeyData?.apiKey && (
                       <div className="mt-2 rounded-lg border overflow-hidden" style={{ height: 240 }}>

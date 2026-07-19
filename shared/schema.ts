@@ -842,6 +842,7 @@ export const menuFeatures = [
   { key: "push-mensagens", label: "Mensagens", group: "Configurações" },
   { key: "ranking-config", label: "Ranking Motoristas (config)", group: "Configurações" },
   { key: "controle-versao", label: "Controle de Versão", group: "Configurações" },
+  { key: "documentacao", label: "Documentação", group: "Configurações" },
 ] as const;
 
 // ============== SYSTEM VERSIONS (CONTROLE DE VERSÃO) ==============
